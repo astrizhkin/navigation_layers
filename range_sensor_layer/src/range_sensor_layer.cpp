@@ -388,6 +388,7 @@ void RangeSensorLayer::removeOutdatedReadings()
   for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; ) {
     if(it_map->second < removal_time) {
       ROS_INFO_STREAM("-");
+      touch(std::get<0>(it_map->first), std::get<1>(it_map->first), &min_x_, &min_y_, &max_x_, &max_y_);
       setCost(std::get<0>(it_map->first), std::get<1>(it_map->first), costmap_2d::FREE_SPACE);
       it_map = marked_point_history_.erase(it_map);
     } else {
