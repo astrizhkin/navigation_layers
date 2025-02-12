@@ -383,15 +383,10 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
 
 void RangeSensorLayer::removeOutdatedReadings()
 {
-  ROS_INFO_STREAM("[range_sensor_layer] Start remove outdated");
-  int removed=0;
   std::map<std::pair<unsigned int, unsigned int>, double>::iterator it_map;
-
   double removal_time = last_reading_time_.toSec() - pixel_decay_;
-  for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; )
-  {
+  for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; ) {
     if(it_map->second < removal_time) {
-      removed++;
       ROS_INFO_STREAM("-");
       setCost(std::get<0>(it_map->first), std::get<1>(it_map->first), costmap_2d::FREE_SPACE);
       it_map = marked_point_history_.erase(it_map);
@@ -399,7 +394,6 @@ void RangeSensorLayer::removeOutdatedReadings()
       it_map++;
     }
   }
-  ROS_INFO_STREAM("[range_sensor_layer] End remove outdated " << removed);
 }
 
 void RangeSensorLayer::update_cell(
