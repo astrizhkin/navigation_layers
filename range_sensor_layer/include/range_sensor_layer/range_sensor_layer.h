@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <costmap_2d/costmap_layer.h>
 #include <costmap_2d/layered_costmap.h>
+#include <costmap_2d/costmap_2d_publisher.h>
 #include <sensor_msgs/Range.h>
 #include <range_sensor_layer/RangeSensorLayerConfig.h>
 #include <dynamic_reconfigure/server.h>
@@ -13,9 +14,6 @@
 #include <utility>
 #include <vector>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
-//#include <nav_msgs/OccupancyGrid.h>
-#include <costmap_2d/costmap_2d_publisher.h>
 
 namespace range_sensor_layer
 {
@@ -31,6 +29,7 @@ public:
   };
 
   RangeSensorLayer();
+  ~RangeSensorLayer();
 
   virtual void onInitialize();
   virtual void updateBounds(double robot_x, double robot_y, double robot_yaw,
@@ -88,11 +87,12 @@ private:
   double min_x_, min_y_, max_x_, max_y_;
 
   bool use_decay_;
+  bool debug_publisher_;
   double pixel_decay_;
   double transform_tolerance_;
   
   dynamic_reconfigure::Server<range_sensor_layer::RangeSensorLayerConfig> *dsrv_;
-
+  costmap_2d::Costmap2DPublisher* publisher_;
 
   float area(int x1, int y1, int x2, int y2, int x3, int y3)
   {
@@ -103,18 +103,6 @@ private:
   {
     return (Bx - Ax) * (Cy - Ay) - (By - Ay) * (Cx - Ax);
   };
-
-  //------------------------------------------------
-  //nav_msgs::OccupancyGrid grid_;
-  //ros::Publisher costmap_pub_;
-  costmap_2d::Costmap2DPublisher* publisher_;
-
-  void initPublisher(ros::NodeHandle * ros_node);
-  
-  //void onNewSubscription(const ros::SingleSubscriberPublisher& pub);
-  
-  //void prepareGrid();
-
 
 };
 }  // namespace range_sensor_layer

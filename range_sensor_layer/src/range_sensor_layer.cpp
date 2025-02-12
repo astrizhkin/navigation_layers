@@ -20,6 +20,14 @@ namespace range_sensor_layer
 
 RangeSensorLayer::RangeSensorLayer() {}
 
+RangeSensorLayer::~RangeSensorLayer() {
+  if (publisher_ != NULL) {
+    delete publisher_;
+  }
+
+  delete dsrv_;
+}
+
 void RangeSensorLayer::onInitialize()
 {
   ros::NodeHandle nh("~/" + name_);
@@ -47,6 +55,7 @@ void RangeSensorLayer::onInitialize()
 
   nh.param("use_decay", use_decay_, false);
   nh.param("pixel_decay", pixel_decay_, 10.0);
+  nh.param("debug_publisher", debug_publisher_, false);
   nh.param("transform_tolerance_", transform_tolerance_, 0.3);
 
   boost::to_upper(sensor_type_name);
@@ -115,7 +124,9 @@ void RangeSensorLayer::onInitialize()
   dsrv_->setCallback(cb);
   global_frame_ = layered_costmap_->getGlobalFrameID();
 
-  initPublisher(&nh);
+  if (debug_publisher_) {
+    publisher_ = new costmap_2d::Costmap2DPublisher(&nh, this, global_frame_, "costmap",true);
+  }
 }
 
 
@@ -395,6 +406,9 @@ void RangeSensorLayer::update_cell(double ox, double oy, double ot, double r, do
       sensor = sensor_model(r, phi, theta);
     }
     double prior = to_prob(getCost(x, y));
+    if(prior<0.1){
+      prior = 0.1;
+    }
     double prob_occ = sensor * prior;
     double prob_not = (1 - sensor) * (1 - prior);
     double new_prob = prob_occ / (prob_occ + prob_not);
@@ -503,8 +517,9 @@ void RangeSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i
 
   buffered_readings_ = 0;
   current_ = true;
-
-  publisher_->publishCostmap();
+  if (debug_publisher_) {
+    publisher_->publishCostmap();
+  }
 }
 
 void RangeSensorLayer::reset()
@@ -525,54 +540,5 @@ void RangeSensorLayer::activate()
 {
   range_msgs_buffer_.clear();
 }
-
-
-// -----------------------------------------------------------------------------------------------------------------------
-
-void RangeSensorLayer::initPublisher(ros::NodeHandle *ros_node) {
-  publisher_ = new costmap_2d::Costmap2DPublisher(ros_node, this, global_frame_, "range_sensor_layer",true);
-
-  //costmap_pub_ = ros_node->advertise<nav_msgs::OccupancyGrid>(topic_name, 1,
-  //  boost::bind(&RangeSensorLayer::onNewSubscription, this, _1));
-
-}
-
-/*void RangeSensorLayer::onNewSubscription(const ros::SingleSubscriberPublisher& pub)
-{
-  prepareGrid();
-  pub.publish(grid_);
-}
-
-void RangeSensorLayer::prepareGrid()
-{
-  boost::unique_lock<Costmap2D::mutex_t> lock(*(costmap_->getMutex()));
-  double resolution = costmap_->getResolution();
-
-  grid_.header.frame_id = global_frame_;
-  grid_.header.stamp = ros::Time::now();
-  grid_.info.resolution = resolution;
-
-  grid_.info.width = costmap_->getSizeInCellsX();
-  grid_.info.height = costmap_->getSizeInCellsY();
-
-  double wx, wy;
-  costmap_->mapToWorld(0, 0, wx, wy);
-  grid_.info.origin.position.x = wx - resolution / 2;
-  grid_.info.origin.position.y = wy - resolution / 2;
-  grid_.info.origin.position.z = 0.0;
-  grid_.info.origin.orientation.w = 1.0;
-  saved_origin_x_ = costmap_->getOriginX();
-  saved_origin_y_ = costmap_->getOriginY();
-
-  grid_.data.resize(grid_.info.width * grid_.info.height);
-
-  unsigned char* data = costmap_->getCharMap();
-  for (unsigned int i = 0; i < grid_.data.size(); i++)
-  {
-    grid_.data[i] = cost_translation_table_[ data[ i ]];
-  }
-}*/
-
-
 
 }  // namespace range_sensor_layer
