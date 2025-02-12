@@ -119,10 +119,11 @@ void RangeSensorLayer::onInitialize()
 
 double RangeSensorLayer::gamma(double theta)
 {
-  if (fabs(theta) > max_angle_)
+  if (fabs(theta) > max_angle_) {
     return 0.0;
-  else
+  } else {
     return 1 - pow(theta / max_angle_, 2);
+  }
 }
 
 double RangeSensorLayer::delta(double phi)
@@ -130,13 +131,14 @@ double RangeSensorLayer::delta(double phi)
   return 1 - (1 + tanh(2 * (phi - phi_v_))) / 2;
 }
 
-void RangeSensorLayer::get_deltas(double angle, double *dx, double *dy)
+void RangeSensorLayer::get_deltas(double angle, double * dx, double * dy)
 {
   double ta = tan(angle);
-  if (ta == 0)
+  if (ta == 0) {
     *dx = 0;
-  else
+  } else {
     *dx = resolution_ / ta;
+  }
 
   *dx = copysign(*dx, cos(angle));
   *dy = copysign(resolution_, sin(angle));
@@ -148,17 +150,17 @@ double RangeSensorLayer::sensor_model(double r, double phi, double theta)
 
   double delta = resolution_;
 
-  if (phi >= 0.0 && phi < r - 2 * delta * r)
+  if (phi >= 0.0 && phi < r - 2 * delta * r) {
     return (1 - lbda) * (0.5);
-  else if (phi < r - delta * r)
-    return lbda * 0.5 * pow((phi - (r - 2 * delta * r)) / (delta * r), 2) + (1 - lbda) * .5;
-  else if (phi < r + delta * r)
-  {
+  } else if (phi < r - delta * r) {
+    return lbda * 0.5 * pow((phi - (r - 2 * delta * r)) / (delta * r), 2) +
+           (1 - lbda) * .5;
+  } else if (phi < r + delta * r) {
     double J = (r - phi) / (delta * r);
     return lbda * ((1 - (0.5) * pow(J, 2)) - 0.5) + 0.5;
-  }
-  else
+  } else {
     return 0.5;
+  }
 }
 
 
@@ -202,16 +204,16 @@ void RangeSensorLayer::updateCostmap()
 
 void RangeSensorLayer::processRangeMsg(sensor_msgs::Range& range_message)
 {
-  if (range_message.min_range == range_message.max_range)
+  if (range_message.min_range == range_message.max_range) {
     processFixedRangeMsg(range_message);
-  else
+  } else {
     processVariableRangeMsg(range_message);
+  }
 }
 
 void RangeSensorLayer::processFixedRangeMsg(sensor_msgs::Range& range_message)
 {
-  if (!std::isinf(range_message.range))
-  {
+  if (!std::isinf(range_message.range)) {
     ROS_ERROR_THROTTLE(1.0,
                        "Fixed distance ranger (min_range == max_range) in frame %s sent invalid value. "
                        "Only -Inf (== object detected) and Inf (== no object detected) are valid.",
@@ -221,11 +223,10 @@ void RangeSensorLayer::processFixedRangeMsg(sensor_msgs::Range& range_message)
 
   bool clear_sensor_cone = false;
 
-  if (range_message.range > 0)  // +inf
-  {
-    if (!clear_on_max_reading_)
+  if (range_message.range > 0) {  // +inf
+    if (!clear_on_max_reading_) {
       return;  // no clearing at all
-
+    }
     clear_sensor_cone = true;
   }
 
@@ -236,13 +237,17 @@ void RangeSensorLayer::processFixedRangeMsg(sensor_msgs::Range& range_message)
 
 void RangeSensorLayer::processVariableRangeMsg(sensor_msgs::Range& range_message)
 {
-  if (range_message.range < range_message.min_range || range_message.range > range_message.max_range)
+  if (range_message.range < range_message.min_range || range_message.range >
+    range_message.max_range)
+  {
     return;
+  }
 
   bool clear_sensor_cone = false;
 
-  if (range_message.range == range_message.max_range && clear_on_max_reading_)
+  if (range_message.range >= range_message.max_range && clear_on_max_reading_) {
     clear_sensor_cone = true;
+  }
 
   updateCostmap(range_message, clear_sensor_cone);
 }
@@ -291,8 +296,7 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
 
   // Update Map with Target Point
   unsigned int aa, ab;
-  if (worldToMap(tx, ty, aa, ab))
-  {
+  if (worldToMap(tx, ty, aa, ab)) {
     setCost(aa, ab, 233);
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
   }
@@ -326,30 +330,28 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   bx1 = std::min(static_cast<int>(size_x_), bx1);
   by1 = std::min(static_cast<int>(size_y_), by1);
 
-  for (unsigned int x = bx0; x <= (unsigned int)bx1; x++)
-  {
-    for (unsigned int y = by0; y <= (unsigned int)by1; y++)
-    {
+  for (unsigned int x = bx0; x <= (unsigned int)bx1; x++) {
+    for (unsigned int y = by0; y <= (unsigned int)by1; y++) {
       bool update_xy_cell = true;
 
-      // Unless inflate_cone_ is set to 100 %, we update cells only within the (partially inflated) sensor cone,
-      // projected on the costmap as a triangle. 0 % corresponds to just the triangle, but if your sensor fov is
-      // very narrow, the covered area can become zero due to cell discretization. See wiki description for more
-      // details
-      if (inflate_cone_ < 1.0)
-      {
+      // Unless inflate_cone_ is set to 100 %, we update cells only within the
+      // (partially inflated) sensor cone, projected on the costmap as a triangle.
+      // 0 % corresponds to just the triangle, but if your sensor fov is very
+      // narrow, the covered area can become zero due to cell discretization.
+      // See wiki description for more details
+      if (inflate_cone_ < 1.0) {
         // Determine barycentric coordinates
         int w0 = orient2d(Ax, Ay, Bx, By, x, y);
         int w1 = orient2d(Bx, By, Ox, Oy, x, y);
         int w2 = orient2d(Ox, Oy, Ax, Ay, x, y);
 
-        // Barycentric coordinates inside area threshold; this is not mathematically sound at all, but it works!
-        float bcciath = -inflate_cone_ * area(Ax, Ay, Bx, By, Ox, Oy);
+        // Barycentric coordinates inside area threshold; this is not mathematically
+        // sound at all, but it works!
+        float bcciath = -static_cast<float>(inflate_cone_) * area(Ax, Ay, Bx, By, Ox, Oy);
         update_xy_cell = w0 >= bcciath && w1 >= bcciath && w2 >= bcciath;
       }
 
-      if (update_xy_cell)
-      {
+      if (update_xy_cell) {
         double wx, wy;
         mapToWorld(x, y, wx, wy);
         update_cell(ox, oy, theta, range_message.range, wx, wy, clear_sensor_cone);
@@ -381,15 +383,15 @@ void RangeSensorLayer::removeOutdatedReadings()
 void RangeSensorLayer::update_cell(double ox, double oy, double ot, double r, double nx, double ny, bool clear)
 {
   unsigned int x, y;
-  if (worldToMap(nx, ny, x, y))
-  {
+  if (worldToMap(nx, ny, x, y)) {
     double dx = nx - ox, dy = ny - oy;
     double theta = atan2(dy, dx) - ot;
     theta = angles::normalize_angle(theta);
     double phi = sqrt(dx * dx + dy * dy);
     double sensor = 0.0;
-    if (!clear)
+    if (!clear) {
       sensor = sensor_model(r, phi, theta);
+    }
     double prior = to_prob(getCost(x, y));
     double prob_occ = sensor * prior;
     double prob_not = (1 - sensor) * (1 - prior);
@@ -421,15 +423,19 @@ void RangeSensorLayer::update_cell(double ox, double oy, double ot, double r, do
 
 void RangeSensorLayer::resetRange()
 {
-  min_x_ = min_y_ =  std::numeric_limits<double>::max();
+  min_x_ = min_y_ = std::numeric_limits<double>::max();
   max_x_ = max_y_ = -std::numeric_limits<double>::max();
 }
 
-void RangeSensorLayer::updateBounds(double robot_x, double robot_y, double robot_yaw,
-                                    double* min_x, double* min_y, double* max_x, double* max_y)
+void RangeSensorLayer::updateBounds(
+  double robot_x, double robot_y,
+  double robot_yaw, double * min_x, double * min_y,
+  double * max_x, double * max_y)
 {
-  if (layered_costmap_->isRolling())
+  robot_yaw = 0 + robot_yaw;  // Avoid error if variable not in use
+  if (layered_costmap_->isRolling()) {
     updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2);
+  }
 
   updateCostmap();
 
@@ -440,14 +446,12 @@ void RangeSensorLayer::updateBounds(double robot_x, double robot_y, double robot
 
   resetRange();
 
-  if (!enabled_)
-  {
+  if (!enabled_) {
     current_ = true;
     return;
   }
 
-  if (buffered_readings_ == 0)
-  {
+  if (buffered_readings_ == 0) {
     if (no_readings_timeout_ > 0.0 &&
         (ros::Time::now() - last_reading_time_).toSec() > no_readings_timeout_)
     {
@@ -461,39 +465,36 @@ void RangeSensorLayer::updateBounds(double robot_x, double robot_y, double robot
 
 void RangeSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int min_j, int max_i, int max_j)
 {
-  if (!enabled_)
+  if (!enabled_) {
     return;
+  }
 
-  unsigned char* master_array = master_grid.getCharMap();
+  unsigned char * master_array = master_grid.getCharMap();
   unsigned int span = master_grid.getSizeInCellsX();
   unsigned char clear = to_cost(clear_threshold_), mark = to_cost(mark_threshold_);
 
-  for (int j = min_j; j < max_j; j++)
-  {
+  for (int j = min_j; j < max_j; j++) {
     unsigned int it = j * span + min_i;
-    for (int i = min_i; i < max_i; i++)
-    {
+    for (int i = min_i; i < max_i; i++) {
       unsigned char prob = costmap_[it];
       unsigned char current;
-      if (prob == costmap_2d::NO_INFORMATION)
-      {
+      if (prob == costmap_2d::NO_INFORMATION) {
         it++;
         continue;
-      }
-      else if (prob > mark)
+      } else if (prob > mark) {
         current = costmap_2d::LETHAL_OBSTACLE;
-      else if (prob < clear)
+      } else if (prob < clear) {
         current = costmap_2d::FREE_SPACE;
-      else
-      {
+      } else {
         it++;
         continue;
       }
 
       unsigned char old_cost = master_array[it];
 
-      if (old_cost == NO_INFORMATION || old_cost < current)
+      if (old_cost == NO_INFORMATION || old_cost < current) {
         master_array[it] = current;
+      }
       it++;
     }
   }
