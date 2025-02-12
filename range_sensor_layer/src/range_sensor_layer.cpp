@@ -114,6 +114,8 @@ void RangeSensorLayer::onInitialize()
     boost::bind(&RangeSensorLayer::reconfigureCB, this, _1, _2);
   dsrv_->setCallback(cb);
   global_frame_ = layered_costmap_->getGlobalFrameID();
+
+  initPublisher(&nh);
 }
 
 
@@ -501,6 +503,8 @@ void RangeSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i
 
   buffered_readings_ = 0;
   current_ = true;
+
+  publisher_->publishCostmap();
 }
 
 void RangeSensorLayer::reset()
@@ -521,5 +525,54 @@ void RangeSensorLayer::activate()
 {
   range_msgs_buffer_.clear();
 }
+
+
+// -----------------------------------------------------------------------------------------------------------------------
+
+void RangeSensorLayer::initPublisher(ros::NodeHandle *ros_node) {
+  publisher_ = new costmap_2d::Costmap2DPublisher(ros_node, this, global_frame_, "range_sensor_layer",true);
+
+  //costmap_pub_ = ros_node->advertise<nav_msgs::OccupancyGrid>(topic_name, 1,
+  //  boost::bind(&RangeSensorLayer::onNewSubscription, this, _1));
+
+}
+
+/*void RangeSensorLayer::onNewSubscription(const ros::SingleSubscriberPublisher& pub)
+{
+  prepareGrid();
+  pub.publish(grid_);
+}
+
+void RangeSensorLayer::prepareGrid()
+{
+  boost::unique_lock<Costmap2D::mutex_t> lock(*(costmap_->getMutex()));
+  double resolution = costmap_->getResolution();
+
+  grid_.header.frame_id = global_frame_;
+  grid_.header.stamp = ros::Time::now();
+  grid_.info.resolution = resolution;
+
+  grid_.info.width = costmap_->getSizeInCellsX();
+  grid_.info.height = costmap_->getSizeInCellsY();
+
+  double wx, wy;
+  costmap_->mapToWorld(0, 0, wx, wy);
+  grid_.info.origin.position.x = wx - resolution / 2;
+  grid_.info.origin.position.y = wy - resolution / 2;
+  grid_.info.origin.position.z = 0.0;
+  grid_.info.origin.orientation.w = 1.0;
+  saved_origin_x_ = costmap_->getOriginX();
+  saved_origin_y_ = costmap_->getOriginY();
+
+  grid_.data.resize(grid_.info.width * grid_.info.height);
+
+  unsigned char* data = costmap_->getCharMap();
+  for (unsigned int i = 0; i < grid_.data.size(); i++)
+  {
+    grid_.data[i] = cost_translation_table_[ data[ i ]];
+  }
+}*/
+
+
 
 }  // namespace range_sensor_layer

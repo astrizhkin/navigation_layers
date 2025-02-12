@@ -14,6 +14,9 @@
 #include <vector>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+//#include <nav_msgs/OccupancyGrid.h>
+#include <costmap_2d/costmap_2d_publisher.h>
+
 namespace range_sensor_layer
 {
 
@@ -87,7 +90,7 @@ private:
   bool use_decay_;
   double pixel_decay_;
   double transform_tolerance_;
-
+  
   dynamic_reconfigure::Server<range_sensor_layer::RangeSensorLayerConfig> *dsrv_;
 
 
@@ -100,6 +103,19 @@ private:
   {
     return (Bx - Ax) * (Cy - Ay) - (By - Ay) * (Cx - Ax);
   };
+
+  //------------------------------------------------
+  //nav_msgs::OccupancyGrid grid_;
+  //ros::Publisher costmap_pub_;
+  costmap_2d::Costmap2DPublisher* publisher_;
+
+  void initPublisher(ros::NodeHandle * ros_node);
+  
+  //void onNewSubscription(const ros::SingleSubscriberPublisher& pub);
+  
+  //void prepareGrid();
+
+
 };
 }  // namespace range_sensor_layer
 #endif  // RANGE_SENSOR_LAYER_RANGE_SENSOR_LAYER_H
