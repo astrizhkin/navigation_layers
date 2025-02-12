@@ -313,8 +313,13 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   // Update Map with Target Point
   unsigned int aa, ab;
   if (worldToMap(tx, ty, aa, ab)) {
-    setCost(aa, ab, 233);
+    const char targetCost = 233;
+    setCost(aa, ab, targetCost);
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
+    if(use_decay_&& targetCost > to_cost(mark_threshold_)) {
+      std::pair<unsigned int, unsigned int> coordinate_pair(aa, ab);
+      marked_point_history_[coordinate_pair] = last_reading_time_.toSec();
+    } 
   }
 
   double mx, my;
@@ -387,8 +392,12 @@ void RangeSensorLayer::removeOutdatedReadings()
   double removal_time = last_reading_time_.toSec() - pixel_decay_;
   for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; ) {
     if(it_map->second < removal_time) {
-      touch(std::get<0>(it_map->first), std::get<1>(it_map->first), &min_x_, &min_y_, &max_x_, &max_y_);
-      setCost(std::get<0>(it_map->first), std::get<1>(it_map->first), costmap_2d::FREE_SPACE);
+      int x = std::get<0>(it_map->first);
+      int y = std::get<1>(it_map->first);
+      double wx, wy;
+      mapToWorld(x,y,wx,wy);
+      touch(wx,wy, &min_x_, &min_y_, &max_x_, &max_y_);
+      setCost(x,y, costmap_2d::FREE_SPACE);
       it_map = marked_point_history_.erase(it_map);
     } else {
       it_map++;
