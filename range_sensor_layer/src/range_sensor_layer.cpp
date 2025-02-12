@@ -32,6 +32,7 @@ void RangeSensorLayer::onInitialize()
 {
   ros::NodeHandle nh("~/" + name_);
   current_ = true;
+  was_reset_ = false;
   buffered_readings_ = 0;
   last_reading_time_ = ros::Time::now();
   default_value_ = to_cost(0.5);
@@ -195,8 +196,9 @@ void RangeSensorLayer::reconfigureCB(range_sensor_layer::RangeSensorLayerConfig 
 
 void RangeSensorLayer::bufferIncomingRangeMsg(const sensor_msgs::RangeConstPtr& range_message)
 {
-  boost::mutex::scoped_lock lock(range_message_mutex_);
+  range_message_mutex_.lock();
   range_msgs_buffer_.push_back(*range_message);
+  range_message_mutex_.unlock();
 }
 
 void RangeSensorLayer::updateCostmap()
@@ -208,10 +210,8 @@ void RangeSensorLayer::updateCostmap()
   range_msgs_buffer_.clear();
   range_message_mutex_.unlock();
 
-  for (std::list<sensor_msgs::Range>::iterator range_msgs_it = range_msgs_buffer_copy.begin();
-       range_msgs_it != range_msgs_buffer_copy.end(); range_msgs_it++)
-  {
-    processRangeMessageFunc_(*range_msgs_it);
+  for (auto & range_msgs_it : range_msgs_buffer_copy) {
+    processRangeMessageFunc_(range_msgs_it);
   }
 }
 
@@ -273,7 +273,10 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   in.header.stamp = range_message.header.stamp;
   in.header.frame_id = range_message.header.frame_id;
 
-  if (!tf_->canTransform(global_frame_, in.header.frame_id, in.header.stamp, ros::Duration(transform_tolerance_)))
+  if (!tf_->canTransform(
+      in.header.frame_id, global_frame_,
+      in.header.stamp,
+      ros::Duration(transform_tolerance_)))
   {
     ROS_ERROR_THROTTLE(1.0, "Range sensor layer can't transform from %s to %s at %f",
                        global_frame_.c_str(), in.header.frame_id.c_str(),
@@ -393,7 +396,9 @@ void RangeSensorLayer::removeOutdatedReadings()
   }
 }
 
-void RangeSensorLayer::update_cell(double ox, double oy, double ot, double r, double nx, double ny, bool clear)
+void RangeSensorLayer::update_cell(
+  double ox, double oy, double ot, double r,
+  double nx, double ny, bool clear)
 {
   unsigned int x, y;
   if (worldToMap(nx, ny, x, y)) {
@@ -519,7 +524,12 @@ void RangeSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i
   }
 
   buffered_readings_ = 0;
-  current_ = true;
+
+  // if not current due to reset, set current now after clearing
+  if (!current_ && was_reset_) {
+    was_reset_ = false;
+    current_ = true;
+  }
   if (debug_publisher_) {
     publisher_->publishCostmap();
   }
@@ -530,7 +540,7 @@ void RangeSensorLayer::reset()
   ROS_DEBUG("Reseting range sensor layer...");
   deactivate();
   resetMaps();
-  current_ = true;
+  was_reset_ = true;
   activate();
 }
 
