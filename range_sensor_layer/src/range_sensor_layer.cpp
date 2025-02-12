@@ -383,6 +383,8 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
 
 void RangeSensorLayer::removeOutdatedReadings()
 {
+  ROS_INFO_STREAM("[range_sensor_layer] Start remove outdated");
+  int removed=0;
   std::map<std::pair<unsigned int, unsigned int>, double>::iterator it_map;
 
   double removal_time = last_reading_time_.toSec() - pixel_decay_;
@@ -390,10 +392,12 @@ void RangeSensorLayer::removeOutdatedReadings()
   {
     if(it_map->second < removal_time)
     {
+      removed++;
       marked_point_history_.erase(it_map);
       setCost(std::get<0>(it_map->first), std::get<1>(it_map->first), costmap_2d::FREE_SPACE);
     }
   }
+  ROS_INFO_STREAM("[range_sensor_layer] End remove outdated " << removed);
 }
 
 void RangeSensorLayer::update_cell(
@@ -430,16 +434,22 @@ void RangeSensorLayer::update_cell(
     {
       std::pair<unsigned int, unsigned int> coordinate_pair(x, y);
       // If the point has a score high enough to be marked in the costmap, we add it's time to the marked_point_history
-      if(c > to_cost(mark_threshold_))
+      if(c > to_cost(mark_threshold_)) {
+        ROS_INFO_STREAM("[range_sensor_layer] Start add mark decay");
         marked_point_history_[coordinate_pair] = last_reading_time_.toSec();
+        ROS_INFO_STREAM("[range_sensor_layer] End add mark decay");
+      }
       // If the point score is not high enough, we try to find it in the mark history point.
       // In the case we find it in the marked_point_history we clear it from the map so we won't checked already cleared point
       else if(c < to_cost(clear_threshold_))
       {
+        ROS_INFO_STREAM("[range_sensor_layer] Start remove mark decay ");
         std::map<std::pair<unsigned int, unsigned int>, double>::iterator it_clear;
         it_clear = marked_point_history_.find(coordinate_pair);
-        if(it_clear != marked_point_history_.end())
+        if(it_clear != marked_point_history_.end()) {
           marked_point_history_.erase(it_clear);
+        }
+        ROS_INFO_STREAM("[range_sensor_layer] End remove mark decay");
       }
     }
   }
