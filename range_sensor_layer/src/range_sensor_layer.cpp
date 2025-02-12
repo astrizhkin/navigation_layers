@@ -411,6 +411,9 @@ void RangeSensorLayer::update_cell(double ox, double oy, double ot, double r, do
     }
     double prob_occ = sensor * prior;
     double prob_not = (1 - sensor) * (1 - prior);
+    if((prob_occ + prob_not) == 0){
+      ROS_ERROR("[range_sensor_layer] Divide by zero???");
+    }
     double new_prob = prob_occ / (prob_occ + prob_not);
 
     ROS_DEBUG("%f %f | %f %f = %f", dx, dy, theta, phi, sensor);
