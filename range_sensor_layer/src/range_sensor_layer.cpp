@@ -278,9 +278,10 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
       in.header.stamp,
       ros::Duration(transform_tolerance_)))
   {
-    ROS_ERROR_THROTTLE(1.0, "Range sensor layer can't transform from %s to %s at %f",
+    ros::Time now = ros::Time::now();
+    ROS_ERROR_THROTTLE(1.0, "Range sensor layer can't transform from %s to %s at %f. Age is %fs",
                        global_frame_.c_str(), in.header.frame_id.c_str(),
-                       in.header.stamp.toSec());
+                       in.header.stamp.toSec(),(now-in.header.stamp).toSec());
     return;
   }
 
