@@ -313,7 +313,7 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
 
   // Update Map with Target Point
   unsigned int aa, ab;
-  if (worldToMap(tx, ty, aa, ab)) {
+  if (range_message.range < range_message.max_range && worldToMap(tx, ty, aa, ab)) {
     const char targetCost = 233;
     setCost(aa, ab, targetCost);
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
@@ -349,8 +349,8 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   // Limit Bounds to Grid
   bx0 = std::max(0, bx0);
   by0 = std::max(0, by0);
-  bx1 = std::min(static_cast<int>(size_x_), bx1);
-  by1 = std::min(static_cast<int>(size_y_), by1);
+  bx1 = std::max(0,std::min(static_cast<int>(size_x_), bx1));
+  by1 = std::max(0,std::min(static_cast<int>(size_y_), by1));
 
   for (unsigned int x = bx0; x <= (unsigned int)bx1; x++) {
     for (unsigned int y = by0; y <= (unsigned int)by1; y++) {
