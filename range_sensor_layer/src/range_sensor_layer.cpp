@@ -60,7 +60,7 @@ void RangeSensorLayer::onInitialize()
   nh.param("transform_tolerance_", transform_tolerance_, 0.3);
 
   boost::to_upper(sensor_type_name);
-  ROS_INFO("%s: %s as input_sensor_type given", name_.c_str(), sensor_type_name.c_str());
+  ROS_INFO("[range_sensor_layer] %s: %s as input_sensor_type given", name_.c_str(), sensor_type_name.c_str());
 
   if (sensor_type_name == "VARIABLE")
     input_sensor_type = VARIABLE;
@@ -70,20 +70,20 @@ void RangeSensorLayer::onInitialize()
     input_sensor_type = ALL;
   else
   {
-    ROS_ERROR("%s: Invalid input sensor type: %s", name_.c_str(), sensor_type_name.c_str());
+    ROS_ERROR("[range_sensor_layer] %s: Invalid input sensor type: %s", name_.c_str(), sensor_type_name.c_str());
   }
 
   // Validate topic names list: it must be a (normally non-empty) list of strings
   if ((topic_names.valid() == false) || (topic_names.getType() != XmlRpc::XmlRpcValue::TypeArray))
   {
-    ROS_ERROR("Invalid topic names list: it must be a non-empty list of strings");
+    ROS_ERROR("[range_sensor_layer] Invalid topic names list: it must be a non-empty list of strings");
     return;
   }
 
   if (topic_names.size() < 1)
   {
     // This could be an error, but I keep it as it can be useful for debug
-    ROS_WARN("Empty topic names list: range sensor layer will have no effect on costmap");
+    ROS_WARN("[range_sensor_layer] Empty topic names list: range sensor layer will have no effect on costmap");
   }
 
   // Traverse the topic names list subscribing to all of them with the same callback method
@@ -91,7 +91,7 @@ void RangeSensorLayer::onInitialize()
   {
     if (topic_names[i].getType() != XmlRpc::XmlRpcValue::TypeString)
     {
-      ROS_WARN("Invalid topic names list: element %d is not a string, so it will be ignored", i);
+      ROS_WARN("[range_sensor_layer] Invalid topic names list: element %d is not a string, so it will be ignored", i);
     }
     else
     {
@@ -109,13 +109,13 @@ void RangeSensorLayer::onInitialize()
       else
       {
         ROS_ERROR(
-          "%s: Invalid input sensor type: %s. Did you make a new type and forgot to choose the subscriber for it?",
+          "[range_sensor_layer] %s: Invalid input sensor type: %s. Did you make a new type and forgot to choose the subscriber for it?",
           name_.c_str(), sensor_type_name.c_str());
       }
 
       range_subs_.push_back(nh.subscribe(topic_name, 100, &RangeSensorLayer::bufferIncomingRangeMsg, this));
 
-      ROS_INFO("RangeSensorLayer: subscribed to topic %s", range_subs_.back().getTopic().c_str());
+      ROS_INFO("[range_sensor_layer] subscribed to topic %s", range_subs_.back().getTopic().c_str());
     }
   }
 
@@ -201,6 +201,11 @@ void RangeSensorLayer::bufferIncomingRangeMsg(const sensor_msgs::RangeConstPtr& 
   range_message_mutex_.unlock();
 }
 
+bool compare_range(const sensor_msgs::Range& first, const sensor_msgs::Range& second)
+{
+  return first.range < second.range;
+}
+
 void RangeSensorLayer::updateCostmap()
 {
   std::list<sensor_msgs::Range> range_msgs_buffer_copy;
@@ -210,6 +215,10 @@ void RangeSensorLayer::updateCostmap()
   range_msgs_buffer_.clear();
   range_message_mutex_.unlock();
 
+  //range_msgs_buffer_copy.sort(compare_range);
+  //if(!range_msgs_buffer_copy.empty()){
+  //  ROS_INFO("[range_sensor_layer] %s processing %d messages with ranges %.2f-%.2f",name_.c_str(),(int)range_msgs_buffer_copy.size(),range_msgs_buffer_copy.front().range,range_msgs_buffer_copy.back().range);
+  //}
   for (auto & range_msgs_it : range_msgs_buffer_copy) {
     processRangeMessageFunc_(range_msgs_it);
   }
@@ -228,7 +237,7 @@ void RangeSensorLayer::processFixedRangeMsg(sensor_msgs::Range& range_message)
 {
   if (!std::isinf(range_message.range)) {
     ROS_ERROR_THROTTLE(1.0,
-                       "Fixed distance ranger (min_range == max_range) in frame %s sent invalid value. "
+                       "[range_sensor_layer] Fixed distance ranger (min_range == max_range) in frame %s sent invalid value. "
                        "Only -Inf (== object detected) and Inf (== no object detected) are valid.",
                        range_message.header.frame_id.c_str());
     return;
@@ -273,25 +282,26 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   in.header.stamp = range_message.header.stamp;
   in.header.frame_id = range_message.header.frame_id;
 
+  ros::Duration transform_tolerance_duration(transform_tolerance_);
   if (!tf_->canTransform(
       in.header.frame_id, global_frame_,
       in.header.stamp,
-      ros::Duration(transform_tolerance_)))
+      transform_tolerance_duration))
   {
     ros::Time now = ros::Time::now();
-    ROS_ERROR_THROTTLE(1.0, "Range sensor layer can't transform from %s to %s at %f. Age is %fs",
+    ROS_ERROR_THROTTLE(1.0, "[range_sensor_layer] can't transform from %s to %s at %f. Age is %fs",
                        global_frame_.c_str(), in.header.frame_id.c_str(),
                        in.header.stamp.toSec(),(now-in.header.stamp).toSec());
     return;
   }
 
-  tf_->transform(in, out, global_frame_);
+  tf_->transform(in, out, global_frame_, transform_tolerance_duration);
 
   double ox = out.point.x, oy = out.point.y;
 
   in.point.x = range_message.range;
 
-  tf_->transform(in, out, global_frame_);
+  tf_->transform(in, out, global_frame_, transform_tolerance_duration);
 
   double tx = out.point.x, ty = out.point.y;
 
@@ -489,7 +499,7 @@ void RangeSensorLayer::updateBounds(
     if (no_readings_timeout_ > 0.0 &&
         (ros::Time::now() - last_reading_time_).toSec() > no_readings_timeout_)
     {
-      ROS_WARN_THROTTLE(2.0, "No range readings received for %.2f seconds, " \
+      ROS_WARN_THROTTLE(2.0, "[range_sensor_layer] No readings received for %.2f seconds, " \
                         "while expected at least every %.2f seconds.",
                         (ros::Time::now() - last_reading_time_).toSec(), no_readings_timeout_);
       current_ = false;
@@ -547,7 +557,7 @@ void RangeSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i
 
 void RangeSensorLayer::reset()
 {
-  ROS_DEBUG("Reseting range sensor layer...");
+  ROS_DEBUG("[range_sensor_layer] reseting...");
   deactivate();
   resetMaps();
   was_reset_ = true;
