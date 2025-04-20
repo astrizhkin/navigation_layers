@@ -8,6 +8,7 @@
 
     <buildtool_depend>catkin</buildtool_depend>
     <exec_depend>range_sensor_layer</exec_depend>
+    <exec_depend>contact_sensor_layer</exec_depend>
     <exec_depend>social_navigation_layers</exec_depend>
     <export>
         <metapackage/>
