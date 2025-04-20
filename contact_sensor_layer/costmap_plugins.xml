@@ -1,0 +1,5 @@
+<library path="lib/libcontact_sensor_layer">
+  <class type="contact_sensor_layer::ContactSensorLayer" base_class_type="costmap_2d::Layer">
+    <description>A contact-sensor (bumper) based obstacle layer for costmap_2d</description>
+  </class>
+</library>
