@@ -150,6 +150,9 @@ void ContactSensorLayer::processContactMsg(contact_sensor_layer::Contact& contac
 {
   if(contact_message.is_active) {
     updateCostmap(contact_message);
+  } else {
+    buffered_readings_++;
+    last_reading_time_ = ros::Time::now();
   }
 }
 
