@@ -324,6 +324,8 @@ void ContactSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min
   if (debug_publisher_) {
     publisher_->publishCostmap();
   }
+  ROS_INFO_STREAM_THROTTLE(2,"[contact_sensor_layer] current " << current_);
+
 }
 
 void ContactSensorLayer::reset()
