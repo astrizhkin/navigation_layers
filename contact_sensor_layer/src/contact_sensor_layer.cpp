@@ -118,7 +118,6 @@ void ContactSensorLayer::reconfigureCB(contact_sensor_layer::ContactSensorLayerC
   {
     enabled_ = config.enabled;
     current_ = false;
-    ROS_INFO_STREAM_THROTTLE(2,"[contact_sensor_layer] reconfigure current = false");
   }
 }
 
@@ -271,11 +270,14 @@ void ContactSensorLayer::updateBounds(
     if (no_readings_timeout_ > 0.0 &&
         (ros::Time::now() - last_reading_time_).toSec() > no_readings_timeout_)
     {
+      //TODO: we should check for all expected frames
       ROS_WARN_THROTTLE(2.0, "[contact_sensor_layer] No readings received for %.2f seconds, " \
                         "while expected at least every %.2f seconds.",
                         (ros::Time::now() - last_reading_time_).toSec(), no_readings_timeout_);
       current_ = false;
     }
+  } else {
+    current_ = true;
   }
 }
 
@@ -325,8 +327,6 @@ void ContactSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min
   if (debug_publisher_) {
     publisher_->publishCostmap();
   }
-  ROS_INFO_STREAM_THROTTLE(2,"[contact_sensor_layer] current " << current_);
-
 }
 
 void ContactSensorLayer::reset()
