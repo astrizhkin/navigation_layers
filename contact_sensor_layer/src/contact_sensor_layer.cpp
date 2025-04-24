@@ -118,6 +118,7 @@ void ContactSensorLayer::reconfigureCB(contact_sensor_layer::ContactSensorLayerC
   {
     enabled_ = config.enabled;
     current_ = false;
+    ROS_INFO_STREAM_THROTTLE(2,"[contact_sensor_layer] reconfigure current = false");
   }
 }
 

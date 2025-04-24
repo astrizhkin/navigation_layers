@@ -191,6 +191,7 @@ void RangeSensorLayer::reconfigureCB(range_sensor_layer::RangeSensorLayerConfig 
   {
     enabled_ = config.enabled;
     current_ = false;
+    ROS_INFO_STREAM_THROTTLE(2,"[range_sensor_layer] reconfigure current = false");
   }
 }
 
