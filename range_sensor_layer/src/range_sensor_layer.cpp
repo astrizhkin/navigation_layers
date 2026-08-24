@@ -55,8 +55,6 @@ void RangeSensorLayer::onInitialize()
   std::string sensor_type_name;
   nh.param("input_sensor_type", sensor_type_name, std::string("ALL"));
 
-  nh.param("use_decay", use_decay_, false);
-  nh.param("pixel_decay", pixel_decay_, 10.0);
   nh.param("debug_publisher", debug_publisher_, false);
   nh.param("allow_clearing", allow_clearing_, false);
   nh.param("transform_tolerance_", transform_tolerance_, 0.3);
@@ -188,6 +186,8 @@ void RangeSensorLayer::reconfigureCB(range_sensor_layer::RangeSensorLayerConfig 
   clear_threshold_ = config.clear_threshold;
   mark_threshold_ = config.mark_threshold;
   clear_on_max_reading_ = config.clear_on_max_reading;
+  use_decay_ = config.use_decay;
+  pixel_decay_ = config.pixel_decay;
 
   if (enabled_ != config.enabled)
   {
