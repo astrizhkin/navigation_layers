@@ -5,6 +5,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <angles/angles.h>
 #include <algorithm>
+#include <cmath>
 #include <list>
 #include <limits>
 #include <map>
@@ -57,6 +58,7 @@ void RangeSensorLayer::onInitialize()
   nh.param("use_decay", use_decay_, false);
   nh.param("pixel_decay", pixel_decay_, 10.0);
   nh.param("debug_publisher", debug_publisher_, false);
+  nh.param("allow_clearing", allow_clearing_, false);
   nh.param("transform_tolerance_", transform_tolerance_, 0.3);
 
   boost::to_upper(sensor_type_name);
@@ -327,10 +329,9 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
     const char targetCost = 233;
     setCost(aa, ab, targetCost);
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
-    if(use_decay_&& targetCost > to_cost(mark_threshold_)) {
-      std::pair<unsigned int, unsigned int> coordinate_pair(aa, ab);
-      marked_point_history_[coordinate_pair] = last_reading_time_.toSec();
-    } 
+    if(use_decay_ && targetCost > to_cost(mark_threshold_)) {
+      marked_point_history_[worldKey(tx, ty)] = last_reading_time_.toSec();
+    }
   }
 
   double mx, my;
@@ -399,16 +400,20 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
 
 void RangeSensorLayer::removeOutdatedReadings()
 {
-  std::map<std::pair<unsigned int, unsigned int>, double>::iterator it_map;
+  std::map<std::pair<int, int>, double>::iterator it_map;
   double removal_time = last_reading_time_.toSec() - pixel_decay_;
   for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; ) {
     if(it_map->second < removal_time) {
-      int x = std::get<0>(it_map->first);
-      int y = std::get<1>(it_map->first);
-      double wx, wy;
-      mapToWorld(x,y,wx,wy);
-      touch(wx,wy, &min_x_, &min_y_, &max_x_, &max_y_);
-      setCost(x,y, costmap_2d::FREE_SPACE);
+      // Key is a world position quantized to 5 cm. Resolve it to the current
+      // cell index; if the cell scrolled out of the rolling window it is
+      // already gone from the map, so just drop the bookkeeping entry.
+      double wx = it_map->first.first * 0.05;
+      double wy = it_map->first.second * 0.05;
+      unsigned int x, y;
+      if (worldToMap(wx, wy, x, y)) {
+        touch(wx, wy, &min_x_, &min_y_, &max_x_, &max_y_);
+        setCost(x, y, costmap_2d::FREE_SPACE);
+      }
       it_map = marked_point_history_.erase(it_map);
     } else {
       it_map++;
@@ -447,15 +452,17 @@ void RangeSensorLayer::update_cell(
 
     setCost(x, y, c);
     if(use_decay_) {
-      std::pair<unsigned int, unsigned int> coordinate_pair(x, y);
+      // Key by the cell's world position so the history survives the
+      // renumbering that a rolling-window origin update performs.
+      std::pair<int, int> coordinate_pair = worldKey(nx, ny);
       // If the point has a score high enough to be marked in the costmap, we add it's time to the marked_point_history
       if(c > to_cost(mark_threshold_)) {
         marked_point_history_[coordinate_pair] = last_reading_time_.toSec();
-      } 
+      }
       // If the point score is not high enough, we try to find it in the mark history point.
       // In the case we find it in the marked_point_history we clear it from the map so we won't checked already cleared point
       else if(c < to_cost(clear_threshold_)) {
-        std::map<std::pair<unsigned int, unsigned int>, double>::iterator it_clear;
+        std::map<std::pair<int, int>, double>::iterator it_clear;
         it_clear = marked_point_history_.find(coordinate_pair);
         if(it_clear != marked_point_history_.end()) {
           marked_point_history_.erase(it_clear);
@@ -520,28 +527,37 @@ void RangeSensorLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i
   unsigned int span = master_grid.getSizeInCellsX();
   unsigned char clear = to_cost(clear_threshold_), mark = to_cost(mark_threshold_);
 
+  // Merge direction depends on allow_clearing_:
+  //  false (default, legacy): one-way — only fill NO_INFORMATION cells and
+  //        raise costs. Never lowers a master cell, so when this layer shares
+  //        its costmap with other layers (static map, contact) its clear cones
+  //        cannot erase their obstacles. Stale US cells are still cleared in
+  //        multi-layer costmaps because the static layer rewrites the master
+  //        region every cycle.
+  //  true: authoritative — a strong "occupied" signal raises the cell to
+  //        LETHAL and a strong "clear" signal lowers it to FREE. The lowering
+  //        is REQUIRED when this layer is the sole layer of its costmap
+  //        (uss_costmap): nothing else ever rewrites the master grid, so a
+  //        raise-only merge would keep every marked cell lethal forever and
+  //        decay could not clear the published map.
   for (int j = min_j; j < max_j; j++) {
     unsigned int it = j * span + min_i;
     for (int i = min_i; i < max_i; i++) {
       unsigned char prob = costmap_[it];
-      unsigned char current;
-      if (prob == costmap_2d::NO_INFORMATION) {
-        it++;
-        continue;
-      } else if (prob > mark) {
-        current = costmap_2d::LETHAL_OBSTACLE;
-      } else if (prob < clear) {
-        current = costmap_2d::FREE_SPACE;
-      } else {
-        it++;
-        continue;
-      }
-
       unsigned char old_cost = master_array[it];
-
-      if (old_cost == NO_INFORMATION || old_cost < current) {
-        master_array[it] = current;
+      if (prob == costmap_2d::NO_INFORMATION) {
+        // layer has no info here: leave the master untouched
+      } else if (prob > mark) {
+        if (allow_clearing_ || old_cost == costmap_2d::NO_INFORMATION ||
+            old_cost < costmap_2d::LETHAL_OBSTACLE) {
+          master_array[it] = costmap_2d::LETHAL_OBSTACLE;
+        }
+      } else if (prob < clear) {
+        if (allow_clearing_ || old_cost == costmap_2d::NO_INFORMATION) {
+          master_array[it] = costmap_2d::FREE_SPACE;
+        }
       }
+      // band [clear, mark]: no strong signal, leave the master untouched
       it++;
     }
   }
@@ -563,6 +579,7 @@ void RangeSensorLayer::reset()
   ROS_DEBUG("[range_sensor_layer] reseting...");
   deactivate();
   resetMaps();
+  marked_point_history_.clear();
   was_reset_ = true;
   activate();
 }

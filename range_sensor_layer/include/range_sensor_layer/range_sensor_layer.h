@@ -204,10 +204,25 @@ private:
     return static_cast<unsigned char>(p * costmap_2d::LETHAL_OBSTACLE);
   }
 
+  /**
+   * @brief Quantize a world position to a 5 cm key for marked_point_history_
+   */
+  inline std::pair<int, int> worldKey(double wx, double wy) const
+  {
+    return std::make_pair(static_cast<int>(std::llround(wx / 0.05)),
+                          static_cast<int>(std::llround(wy / 0.05)));
+  }
+
   std::function<void(sensor_msgs::Range & range_message)> processRangeMessageFunc_;
   std::mutex range_message_mutex_;
   std::list<sensor_msgs::Range> range_msgs_buffer_;
-  std::map<std::pair<unsigned int, unsigned int>, double> marked_point_history_;
+  // World coordinate (quantized to 5 cm, the costmap cell size) of a marked
+  // cell -> time of its last mark. Keyed by world position rather than cell
+  // index: in a rolling costmap the origin moves with the robot and
+  // Costmap2D::updateOrigin renumbers every cell, so cell-index keys would
+  // point at the wrong world cells after a move and the decay could never
+  // clear what it marked.
+  std::map<std::pair<int, int>, double> marked_point_history_;
 
   double max_angle_, phi_v_;
   double inflate_cone_;
@@ -227,6 +242,12 @@ private:
   bool use_decay_;
   bool debug_publisher_;
   double pixel_decay_;
+  // May updateCosts() lower master cells (strong clear -> FREE)?
+  // false = legacy one-way merge (fill unknown + raise only) — safe when the
+  // layer shares its costmap with static/contact layers; true = authoritative
+  // merge, required when this layer is the SOLE layer of its costmap so that
+  // decay can actually clear cells nothing else rewrites (uss_costmap).
+  bool allow_clearing_;
   
   dynamic_reconfigure::Server<range_sensor_layer::RangeSensorLayerConfig> *dsrv_;
   costmap_2d::Costmap2DPublisher* publisher_;
