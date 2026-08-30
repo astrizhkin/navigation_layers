@@ -165,9 +165,7 @@ double RangeSensorLayer::sensor_model(double r, double phi, double theta)
   // Obstacle band thickness: scales with the reading, floored at
   // min_obstacle_thickness (m) — the absolute minimum thickness.
   double full_thickness = 2.0 * resolution_ * r;
-  if (full_thickness < min_obstacle_thickness_) {
-    full_thickness = min_obstacle_thickness_;
-  }
+  full_thickness = std::max(full_thickness, min_obstacle_thickness_);
   double half_thickness = 0.5 * full_thickness;
 
   // Band center. obstacle_center_offset is a fraction of the full thickness:
@@ -196,7 +194,7 @@ void RangeSensorLayer::reconfigureCB(range_sensor_layer::RangeSensorLayerConfig 
   no_readings_timeout_ = config.no_readings_timeout;
   clear_threshold_ = config.clear_threshold;
   mark_threshold_ = config.mark_threshold;
-  min_obstacle_thickness_ = config.min_obstacle_thickness;
+  min_obstacle_thickness_ = std::max(config.min_obstacle_thickness, resolution_);
   obstacle_center_offset_ = config.obstacle_center_offset;
   clear_on_max_reading_ = config.clear_on_max_reading;
   use_decay_ = config.use_decay;
