@@ -162,19 +162,26 @@ double RangeSensorLayer::sensor_model(double r, double phi, double theta)
 {
   double lbda = delta(phi) * gamma(theta);
 
-  //double delta = resolution_;
-  double half_thickness = resolution_ * r;
-  if(half_thickness < resolution_) {
-    half_thickness = resolution_;
+  // Obstacle band thickness: scales with the reading, floored at
+  // min_obstacle_thickness (m) — the absolute minimum thickness.
+  double full_thickness = 2.0 * resolution_ * r;
+  if (full_thickness < min_obstacle_thickness_) {
+    full_thickness = min_obstacle_thickness_;
   }
+  double half_thickness = 0.5 * full_thickness;
 
-  if (phi >= 0.0 && phi < r - 2 * half_thickness) {
+  // Band center. obstacle_center_offset is a fraction of the full thickness:
+  // 0 = at the reading (model unchanged), -0.5 = shift half the thickness
+  // toward the sensor, +0.5 = shift half the thickness away from the sensor.
+  double center = r + obstacle_center_offset_ * full_thickness;
+
+  if (phi >= 0.0 && phi < center - 2 * half_thickness) {
     return (1 - lbda) * (0.5);
-  } else if (phi < r - half_thickness) {
-    return lbda * 0.5 * pow((phi - (r - 2 * half_thickness)) / (half_thickness), 2) +
+  } else if (phi < center - half_thickness) {
+    return lbda * 0.5 * pow((phi - (center - 2 * half_thickness)) / half_thickness, 2) +
            (1 - lbda) * .5;
-  } else if (phi < r + half_thickness) {
-    double J = (r - phi) / (half_thickness);
+  } else if (phi < center + half_thickness) {
+    double J = (center - phi) / half_thickness;
     return lbda * ((1 - (0.5) * pow(J, 2)) - 0.5) + 0.5;
   } else {
     return 0.5;
@@ -189,6 +196,8 @@ void RangeSensorLayer::reconfigureCB(range_sensor_layer::RangeSensorLayerConfig 
   no_readings_timeout_ = config.no_readings_timeout;
   clear_threshold_ = config.clear_threshold;
   mark_threshold_ = config.mark_threshold;
+  min_obstacle_thickness_ = config.min_obstacle_thickness;
+  obstacle_center_offset_ = config.obstacle_center_offset;
   clear_on_max_reading_ = config.clear_on_max_reading;
   use_decay_ = config.use_decay;
   pixel_decay_ = config.pixel_decay;

@@ -229,6 +229,11 @@ private:
   std::string global_frame_;
 
   double clear_threshold_, mark_threshold_;
+  // sensor-model fill tuning: absolute min full obstacle thickness (m), and the
+  // band-center offset as a fraction of the thickness (0 = at reading,
+  // +/-0.5 = shift by half the thickness toward/away from the sensor).
+  double min_obstacle_thickness_;
+  double obstacle_center_offset_;
   bool clear_on_max_reading_;
   bool was_reset_;
 
