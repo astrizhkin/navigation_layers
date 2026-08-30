@@ -162,15 +162,19 @@ double RangeSensorLayer::sensor_model(double r, double phi, double theta)
 {
   double lbda = delta(phi) * gamma(theta);
 
-  double delta = resolution_;
+  //double delta = resolution_;
+  double half_thickness = resolution_ * r;
+  if(half_thickness < resolution_) {
+    half_thickness = resolution_;
+  }
 
-  if (phi >= 0.0 && phi < r - 2 * delta * r) {
+  if (phi >= 0.0 && phi < r - 2 * half_thickness) {
     return (1 - lbda) * (0.5);
-  } else if (phi < r - delta * r) {
-    return lbda * 0.5 * pow((phi - (r - 2 * delta * r)) / (delta * r), 2) +
+  } else if (phi < r - half_thickness) {
+    return lbda * 0.5 * pow((phi - (r - 2 * half_thickness)) / (half_thickness), 2) +
            (1 - lbda) * .5;
-  } else if (phi < r + delta * r) {
-    double J = (r - phi) / (delta * r);
+  } else if (phi < r + half_thickness) {
+    double J = (r - phi) / (half_thickness);
     return lbda * ((1 - (0.5) * pow(J, 2)) - 0.5) + 0.5;
   } else {
     return 0.5;
