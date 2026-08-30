@@ -205,12 +205,12 @@ private:
   }
 
   /**
-   * @brief Quantize a world position to a 5 cm key for marked_point_history_
+   * @brief Quantize a world position to a resolution key for marked_point_history_
    */
   inline std::pair<int, int> worldKey(double wx, double wy) const
   {
-    return std::make_pair(static_cast<int>(std::llround(wx / 0.05)),
-                          static_cast<int>(std::llround(wy / 0.05)));
+    return std::make_pair(static_cast<int>(std::llround(wx / resolution_)),
+                          static_cast<int>(std::llround(wy / resolution_)));
   }
 
   std::function<void(sensor_msgs::Range & range_message)> processRangeMessageFunc_;

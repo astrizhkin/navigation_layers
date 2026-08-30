@@ -415,11 +415,11 @@ void RangeSensorLayer::removeOutdatedReadings()
   double removal_time = last_reading_time_.toSec() - pixel_decay_;
   for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; ) {
     if(it_map->second < removal_time) {
-      // Key is a world position quantized to 5 cm. Resolve it to the current
+      // Key is a world position quantized to resolution. Resolve it to the current
       // cell index; if the cell scrolled out of the rolling window it is
       // already gone from the map, so just drop the bookkeeping entry.
-      double wx = it_map->first.first * 0.05;
-      double wy = it_map->first.second * 0.05;
+      double wx = it_map->first.first * resolution_;
+      double wy = it_map->first.second * resolution_;
       unsigned int x, y;
       if (worldToMap(wx, wy, x, y)) {
         touch(wx, wy, &min_x_, &min_y_, &max_x_, &max_y_);
