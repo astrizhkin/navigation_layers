@@ -205,23 +205,34 @@ private:
   }
 
   /**
-   * @brief Quantize a world position to a resolution key for marked_point_history_
+   * @brief Fixed world-lattice key for a costmap cell, for marked_point_history_
+   *
+   * The key is the cell's index in the fixed world lattice. Costmap2D keeps
+   * the rolling origin on that lattice (updateOrigin snaps it to a multiple
+   * of resolution_), so the lattice does not move with the robot and the key
+   * survives every origin update. Plain cell indices break there (the
+   * renumbering after an origin move points at the wrong world cell), and
+   * quantizing the cell's *center* world position to the lattice does not
+   * round-trip through worldToMap: the center is a half-cell past the cell
+   * edge, so the double rounding (llround at mark time, int(v+0.5) at clear
+   * time) resolves some keys to the neighboring cell — depending on the
+   * float value of the current origin — and the marked cell itself is never
+   * freed. Integer-only arithmetic makes key -> cell exact for any origin.
    */
-  inline std::pair<int, int> worldKey(double wx, double wy) const
+  inline std::pair<int, int> worldCellKey(unsigned int x, unsigned int y) const
   {
-    return std::make_pair(static_cast<int>(std::llround(wx / resolution_)),
-                          static_cast<int>(std::llround(wy / resolution_)));
+    return std::make_pair(static_cast<int>(x) + static_cast<int>(std::llround(origin_x_ / resolution_)),
+                          static_cast<int>(y) + static_cast<int>(std::llround(origin_y_ / resolution_)));
   }
 
   std::function<void(sensor_msgs::Range & range_message)> processRangeMessageFunc_;
   std::mutex range_message_mutex_;
   std::list<sensor_msgs::Range> range_msgs_buffer_;
-  // World coordinate (quantized to 5 cm, the costmap cell size) of a marked
-  // cell -> time of its last mark. Keyed by world position rather than cell
-  // index: in a rolling costmap the origin moves with the robot and
-  // Costmap2D::updateOrigin renumbers every cell, so cell-index keys would
-  // point at the wrong world cells after a move and the decay could never
-  // clear what it marked.
+  // Fixed world-lattice index of a marked cell (see worldCellKey) -> time of
+  // its last mark. Keyed by world lattice index rather than cell index: in a
+  // rolling costmap the origin moves with the robot and renumbers every
+  // cell, so cell-index keys would point at the wrong world cells after a
+  // move and the decay could never clear what it marked.
   std::map<std::pair<int, int>, double> marked_point_history_;
 
   double max_angle_, phi_v_;

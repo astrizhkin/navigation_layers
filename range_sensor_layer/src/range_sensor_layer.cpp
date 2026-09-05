@@ -341,7 +341,7 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
     setCost(aa, ab, targetCost);
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
     if(use_decay_ && targetCost > to_cost(mark_threshold_)) {
-      marked_point_history_[worldKey(tx, ty)] = last_reading_time_.toSec();
+      marked_point_history_[worldCellKey(aa, ab)] = last_reading_time_.toSec();
     }
   }
 
@@ -413,15 +413,19 @@ void RangeSensorLayer::removeOutdatedReadings()
 {
   std::map<std::pair<int, int>, double>::iterator it_map;
   double removal_time = last_reading_time_.toSec() - pixel_decay_;
+  const int kx = static_cast<int>(std::llround(origin_x_ / resolution_));
+  const int ky = static_cast<int>(std::llround(origin_y_ / resolution_));
   for (it_map = marked_point_history_.begin() ; it_map != marked_point_history_.end() ; ) {
     if(it_map->second < removal_time) {
-      // Key is a world position quantized to resolution. Resolve it to the current
-      // cell index; if the cell scrolled out of the rolling window it is
-      // already gone from the map, so just drop the bookkeeping entry.
-      double wx = it_map->first.first * resolution_;
-      double wy = it_map->first.second * resolution_;
-      unsigned int x, y;
-      if (worldToMap(wx, wy, x, y)) {
+      // Key is the cell's fixed world-lattice index; subtract the current
+      // origin's lattice offset to get the current cell index. If the cell
+      // scrolled out of the rolling window it is already gone from the map,
+      // so just drop the bookkeeping entry.
+      const int x = it_map->first.first - kx;
+      const int y = it_map->first.second - ky;
+      if (x >= 0 && y >= 0 && x < static_cast<int>(size_x_) && y < static_cast<int>(size_y_)) {
+        double wx, wy;
+        mapToWorld(static_cast<unsigned int>(x), static_cast<unsigned int>(y), wx, wy);
         touch(wx, wy, &min_x_, &min_y_, &max_x_, &max_y_);
         setCost(x, y, costmap_2d::FREE_SPACE);
       }
@@ -463,9 +467,9 @@ void RangeSensorLayer::update_cell(
 
     setCost(x, y, c);
     if(use_decay_) {
-      // Key by the cell's world position so the history survives the
-      // renumbering that a rolling-window origin update performs.
-      std::pair<int, int> coordinate_pair = worldKey(nx, ny);
+      // Key by the cell's fixed world-lattice index so the history survives
+      // the renumbering that a rolling-window origin update performs.
+      std::pair<int, int> coordinate_pair = worldCellKey(x, y);
       // If the point has a score high enough to be marked in the costmap, we add it's time to the marked_point_history
       if(c > to_cost(mark_threshold_)) {
         marked_point_history_[coordinate_pair] = last_reading_time_.toSec();
