@@ -163,8 +163,10 @@ private:
 
   /**
    * @brief Get the gamma value for an angle, theta
+   * @param exp gamma exponent (mark or clear profile, see gamma_exp /
+   *        gamma_exp_clear)
    */
-  inline double gamma(double theta);
+  inline double gamma(double theta, double exp);
 
   /**
    * @brief Get the delta value for an angle, phi
@@ -236,6 +238,13 @@ private:
   std::map<std::pair<int, int>, double> marked_point_history_;
 
   double max_angle_, phi_v_;
+  // Exponent in gamma(theta) = 1 - (theta/max_angle_)^exp. Two profiles:
+  // gamma_exp for MARKING (obstacle band + ramp, center-peaked trust) and
+  // gamma_exp_clear for CLEARING (free space ahead of the reading, flatter
+  // so blind/edge cells get a real clear instead of lingering).
+  double gamma_exp_;
+  double gamma_exp_clear_;
+  double delta_slope_;  // tanh slope in delta(phi) = 1 - (1+tanh(delta_slope_*(phi-phi_v_)))/2
   double inflate_cone_;
   std::string global_frame_;
 

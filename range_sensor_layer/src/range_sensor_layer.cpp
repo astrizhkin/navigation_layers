@@ -131,18 +131,20 @@ void RangeSensorLayer::onInitialize()
 }
 
 
-double RangeSensorLayer::gamma(double theta)
+double RangeSensorLayer::gamma(double theta, double exp)
 {
   if (fabs(theta) > max_angle_) {
     return 0.0;
   } else {
-    return 1 - pow(theta / max_angle_, 2);
+    // exp=2 (stock) is zero at the cone edge; a lower exponent keeps the
+    // weight meaningful near the edge.
+    return 1 - pow(theta / max_angle_, exp);
   }
 }
 
 double RangeSensorLayer::delta(double phi)
 {
-  return 1 - (1 + tanh(2 * (phi - phi_v_))) / 2;
+  return 1 - (1 + tanh(delta_slope_ * (phi - phi_v_))) / 2;
 }
 
 void RangeSensorLayer::get_deltas(double angle, double * dx, double * dy)
@@ -160,7 +162,14 @@ void RangeSensorLayer::get_deltas(double angle, double * dx, double * dy)
 
 double RangeSensorLayer::sensor_model(double r, double phi, double theta)
 {
-  double lbda = delta(phi) * gamma(theta);
+  // Two trust profiles: the MARK (obstacle band + ramp) uses gamma_exp
+  // (center-peaked — trust the boresight, less on the angles), the CLEAR
+  // (free space ahead of the reading) uses gamma_exp_clear (flat by
+  // default, so blind/edge cells that the mark profile cannot see through
+  // are still cleared instead of lingering until pixel_decay).
+  double dphi = delta(phi);
+  double lbda_mark = dphi * gamma(theta, gamma_exp_);
+  double lbda_clear = dphi * gamma(theta, gamma_exp_clear_);
 
   // Obstacle band thickness: scales with the reading, floored at
   // min_obstacle_thickness (m) — the absolute minimum thickness.
@@ -174,13 +183,18 @@ double RangeSensorLayer::sensor_model(double r, double phi, double theta)
   double center = r + obstacle_center_offset_ * full_thickness;
 
   if (phi >= 0.0 && phi < center - 2 * half_thickness) {
-    return (1 - lbda) * (0.5);
+    // Free space ahead of the reading: clearing only, clear profile.
+    return (1 - lbda_clear) * (0.5);
   } else if (phi < center - half_thickness) {
-    return lbda * 0.5 * pow((phi - (center - 2 * half_thickness)) / half_thickness, 2) +
-           (1 - lbda) * .5;
+    // Ramp from the free-space value up to the band edge (0.5). Still ahead
+    // of the reading, so it uses the clear profile (continuous at both ends).
+    return lbda_clear * 0.5 *
+           pow((phi - (center - 2 * half_thickness)) / half_thickness, 2) +
+           (1 - lbda_clear) * .5;
   } else if (phi < center + half_thickness) {
+    // Obstacle band: marking only, mark profile.
     double J = (center - phi) / half_thickness;
-    return lbda * ((1 - (0.5) * pow(J, 2)) - 0.5) + 0.5;
+    return lbda_mark * ((1 - (0.5) * pow(J, 2)) - 0.5) + 0.5;
   } else {
     return 0.5;
   }
@@ -190,6 +204,9 @@ double RangeSensorLayer::sensor_model(double r, double phi, double theta)
 void RangeSensorLayer::reconfigureCB(range_sensor_layer::RangeSensorLayerConfig &config, uint32_t level)
 {
   phi_v_ = config.phi;
+  gamma_exp_ = config.gamma_exp;
+  gamma_exp_clear_ = config.gamma_exp_clear;
+  delta_slope_ = config.delta_slope;
   inflate_cone_ = config.inflate_cone;
   no_readings_timeout_ = config.no_readings_timeout;
   clear_threshold_ = config.clear_threshold;
