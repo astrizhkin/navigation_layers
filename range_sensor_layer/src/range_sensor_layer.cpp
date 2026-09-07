@@ -369,9 +369,20 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
 
   double mx, my;
 
+  // Cone side points must reach the FAR EDGE of the obstacle band, which the
+  // sensor model places at r + (obstacle_center_offset + 0.5) * full_thickness.
+  // Sizing from the raw reading (1.2*d, as before) only reaches
+  // 1.2*d*cos(max_angle) = 1.04*d along the boresight, so whenever the band
+  // is pushed out by the min_obstacle_thickness floor / offset the outer
+  // part of the band fell outside the update box and was never updated
+  // (d = 1 m, ft = 0.15: box ended at 1.04 m, band ends at 1.12 m). Keep the
+  // original 20 % margin, applied to the band far edge instead of d.
+  double full_t = std::max(2.0 * resolution_ * d, min_obstacle_thickness_);
+  const double cone_depth = 1.2 * (d + (obstacle_center_offset_ + 0.5) * full_t);
+
   // Update left side of sonar cone
-  mx = ox + cos(theta - max_angle_) * d * 1.2;
-  my = oy + sin(theta - max_angle_) * d * 1.2;
+  mx = ox + cos(theta - max_angle_) * cone_depth;
+  my = oy + sin(theta - max_angle_) * cone_depth;
   worldToMapNoBounds(mx, my, Ax, Ay);
   bx0 = std::min(bx0, Ax);
   bx1 = std::max(bx1, Ax);
@@ -380,8 +391,8 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   touch(mx, my, &min_x_, &min_y_, &max_x_, &max_y_);
 
   // Update right side of sonar cone
-  mx = ox + cos(theta + max_angle_) * d * 1.2;
-  my = oy + sin(theta + max_angle_) * d * 1.2;
+  mx = ox + cos(theta + max_angle_) * cone_depth;
+  my = oy + sin(theta + max_angle_) * cone_depth;
 
   worldToMapNoBounds(mx, my, Bx, By);
   bx0 = std::min(bx0, Bx);
