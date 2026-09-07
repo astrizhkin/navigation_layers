@@ -357,15 +357,15 @@ void RangeSensorLayer::updateCostmap(sensor_msgs::Range& range_message, bool cle
   touch(ox, oy, &min_x_, &min_y_, &max_x_, &max_y_);
 
   // Update Map with Target Point
-  unsigned int aa, ab;
-  if (range_message.range < range_message.max_range && worldToMap(tx, ty, aa, ab)) {
-    const char targetCost = 233;
-    setCost(aa, ab, targetCost);
-    touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
-    if(use_decay_ && targetCost > to_cost(mark_threshold_)) {
-      marked_point_history_[worldCellKey(aa, ab)] = last_reading_time_.toSec();
-    }
-  }
+  // unsigned int aa, ab;
+  // if (range_message.range < range_message.max_range && worldToMap(tx, ty, aa, ab)) {
+  //   const char targetCost = 233;
+  //   setCost(aa, ab, targetCost);
+  //   touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
+  //   if(use_decay_ && targetCost > to_cost(mark_threshold_)) {
+  //     marked_point_history_[worldCellKey(aa, ab)] = last_reading_time_.toSec();
+  //   }
+  // }
 
   double mx, my;
 
