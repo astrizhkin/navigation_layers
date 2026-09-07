@@ -137,8 +137,13 @@ double RangeSensorLayer::gamma(double theta, double exp)
     return 0.0;
   } else {
     // exp=2 (stock) is zero at the cone edge; a lower exponent keeps the
-    // weight meaningful near the edge.
-    return 1 - pow(theta / max_angle_, exp);
+    // weight meaningful near the edge. fabs matters: theta is signed here,
+    // and pow(negative, non-integer) is NaN (odd integer exponents return
+    // a negative base -> gamma > 1 -> lambda_clear > 1 -> NEGATIVE "clear"
+    // sensor values -> the to_cost unsigned-char cast wraps to ~250 and
+    // "clears" the cell to LETHAL — the 2026-09-07 clear-gamma-3.0 phantom
+    // wall).
+    return 1 - pow(fabs(theta) / max_angle_, exp);
   }
 }
 
